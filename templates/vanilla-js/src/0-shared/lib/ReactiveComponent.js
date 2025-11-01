@@ -57,9 +57,9 @@ export class ReactiveComponent {
 		this._update()
 	}
 
-	render() {
+	getElement() {
 		if (!this._element) {
-			this._element = this._createDomElement()
+			this._element = this.render()
 		}
 		return this._element
 	}

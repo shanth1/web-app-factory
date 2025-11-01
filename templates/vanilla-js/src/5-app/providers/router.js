@@ -38,7 +38,8 @@ class Router {
 
 		if (pageFactory) {
 			const pageComponent = pageFactory()
-			this.pageContainer.append(pageComponent.render())
+			this.pageContainer.append(pageComponent.getElement())
+			pageComponent.componentDidMount()
 		} else {
 			this.pageContainer.textContent = '404 | Page Not Found'
 		}

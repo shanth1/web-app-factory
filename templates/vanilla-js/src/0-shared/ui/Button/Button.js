@@ -2,8 +2,14 @@ import { ReactiveComponent, h } from '@/0-shared/lib/ReactiveComponent'
 import './Button.css'
 
 export class Button extends ReactiveComponent {
-	_createDomElement() {
-		const { text, onClick, variant = 'primary' } = this.props
-		return h('button', { className: `button button-${variant}`, onClick }, text)
+	render() {
+		const { text, onClick, variant = 'primary', disabled = false } = this.props
+		const buttonElement = h(
+			'button',
+			{ className: `button button-${variant}`, onClick },
+			text
+		)
+		buttonElement.disabled = disabled
+		return buttonElement
 	}
 }
