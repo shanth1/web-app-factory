@@ -1,0 +1,22 @@
+{
+	"name": "template-vanilla-js",
+	"private": true,
+	"version": "1.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"preview": "vite preview",
+		"cleanup": "node scripts/cleanup.js",
+		"create:component": "node scripts/component.js"
+	},
+	"devDependencies": {
+		"vite": "^5.1.4",
+		"vite-plugin-pwa": "^0.19.2"
+	},
+	"dependencies": {
+		"chalk": "^5.3.0",
+		"fs-extra": "^11.2.0",
+		"inquirer": "^9.2.15"
+	}
+}
