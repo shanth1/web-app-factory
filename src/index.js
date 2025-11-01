@@ -10,9 +10,21 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const templatesDir = path.resolve(__dirname, '../templates')
 
+function getPackageManager() {
+	const userAgent = process.env.npm_config_user_agent
+	if (userAgent) {
+		if (userAgent.startsWith('npm')) return 'npm'
+		if (userAgent.startsWith('yarn')) return 'yarn'
+		if (userAgent.startsWith('pnpm')) return 'pnpm'
+	}
+	return 'npm'
+}
+
 async function run() {
 	console.log(chalk.cyan('⚛️  Welcome to the Awesome App Generator!'))
 	console.log(chalk.gray("Let's create a new project from a template."))
+
+	const initialPackageManager = getPackageManager()
 
 	const answers = await inquirer.prompt([
 		{
@@ -36,9 +48,16 @@ async function run() {
 			message: 'Include documentation and helper scripts (recommended)?',
 			default: true,
 		},
+		{
+			type: 'list',
+			name: 'packageManager',
+			message: 'Which package manager do you want to use?',
+			choices: ['npm', 'yarn', 'pnpm'],
+			default: initialPackageManager,
+		},
 	])
 
-	const { projectName, template, includeExtras } = answers
+	const { projectName, template, includeExtras, packageManager } = answers // <--- Добавили packageManager
 	const targetPath = path.join(process.cwd(), projectName)
 
 	if (await fs.pathExists(targetPath)) {
@@ -75,8 +94,21 @@ async function run() {
 	console.log(chalk.green('\n✅ Project created successfully!'))
 	console.log('\nNext steps:')
 	console.log(chalk.yellow(`  cd ${projectName}`))
-	console.log(chalk.yellow('  npm install'))
-	console.log(chalk.yellow('  npm run dev'))
+
+	switch (packageManager) {
+		case 'yarn':
+			console.log(chalk.yellow('  yarn install'))
+			console.log(chalk.yellow('  yarn dev'))
+			break
+		case 'pnpm':
+			console.log(chalk.yellow('  pnpm install'))
+			console.log(chalk.yellow('  pnpm run dev'))
+			break
+		default: // npm
+			console.log(chalk.yellow('  npm install'))
+			console.log(chalk.yellow('  npm run dev'))
+			break
+	}
 }
 
 run().catch(error => {
