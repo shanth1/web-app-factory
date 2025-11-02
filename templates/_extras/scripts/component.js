@@ -6,20 +6,22 @@ import chalk from 'chalk'
 const srcPath = path.join(process.cwd(), 'src')
 
 const layerChoices = '__LAYER_CHOICES__'
+const ext = '__EXT__'
 
 const templates = {
-	component:
-		name => `import { ReactiveComponent, h } from '@/shared/lib/ReactiveComponent';
-import './${name}.css';
+	component: name => `import './${name}.css';
 
-export class ${name} extends ReactiveComponent {
-  render() {
-    return h('div', { className: '${name.toLowerCase()}' }, '${name}');
-  }
-}
+export const ${name} = () => {
+  return (
+    <div className="${name.toLowerCase()}">
+      ${name} Component
+    </div>
+  );
+};
 `,
 	css: name => `.${name.toLowerCase()} {\n  /* Your styles here */\n}\n`,
-	index: name => `export { ${name} } from './${name}';\n`,
+	index: (name, ext) =>
+		`export { ${name} } from './${name}.${ext.replace('.', '')}';\n`,
 }
 
 async function createComponent() {
@@ -51,9 +53,9 @@ async function createComponent() {
 	await fs.ensureDir(componentPath)
 
 	const files = {
-		[`${name}.js`]: templates.component(name),
+		[`${name}.${ext}`]: templates.component(name),
 		[`${name}.css`]: templates.css(name),
-		['index.js']: templates.index(name),
+		[`index.js`]: templates.index(name, ext),
 	}
 
 	for (const [fileName, content] of Object.entries(files)) {

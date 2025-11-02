@@ -1,0 +1,25 @@
+.header-widget {
+	background-color: #242424;
+	padding: 16px 24px;
+	color: white;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.header-widget-nav {
+	display: flex;
+	gap: 20px;
+	align-items: center;
+	max-width: 960px;
+	margin: 0 auto;
+}
+
+.nav-link {
+	color: #f9f9f9;
+	text-decoration: none;
+	font-weight: 500;
+	transition: color 0.2s;
+}
+
+.nav-link:hover {
+	color: #007bff;
+}

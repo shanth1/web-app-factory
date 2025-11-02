@@ -28,6 +28,28 @@ const classicToAlphabeticalMap = {
 	shared: 'base',
 }
 
+async function findViteConfigFile(projectPath) {
+	const possibleConfigs = ['vite.config.js', 'vite.config.ts']
+	for (const file of possibleConfigs) {
+		const filePath = path.join(projectPath, file)
+		if (await fs.pathExists(filePath)) {
+			return filePath
+		}
+	}
+	return null
+}
+
+async function findMainFile(appLayerPath) {
+	const possibleMains = ['main.js', 'main.jsx', 'main.ts', 'main.tsx']
+	for (const file of possibleMains) {
+		const filePath = path.join(appLayerPath, file)
+		if (await fs.pathExists(filePath)) {
+			return filePath
+		}
+	}
+	return null
+}
+
 async function run() {
 	console.log(chalk.cyan('⚛️  Welcome to the Web App Factory!'))
 	console.log(chalk.gray("Let's configure your new project."))
@@ -45,7 +67,9 @@ async function run() {
 
 	console.log(
 		chalk.blue(
-			`\nCreating project in ${isCurrentDir ? 'current directory' : chalk.bold(targetDirName)}...`
+			`\nCreating project in ${
+				isCurrentDir ? 'current directory' : chalk.bold(targetDirName)
+			}...`
 		)
 	)
 
@@ -75,7 +99,10 @@ function getProjectConfiguration() {
 			type: 'list',
 			name: 'template',
 			message: 'Select a project template:',
-			choices: [{ name: 'Vanilla JavaScript', value: 'vanilla-js' }],
+			choices: [
+				{ name: 'Vanilla JavaScript', value: 'vanilla-js' },
+				{ name: 'React (JavaScript)', value: 'react-js' },
+			],
 		},
 		{
 			type: 'list',
@@ -219,7 +246,7 @@ async function postProcessProject(targetPath, answers, targetDirName) {
 	const finalNamingMap = await handleFsdNaming(targetPath, answers.fsdNaming)
 
 	if (answers.useTailwind) {
-		await handleTailwind(targetPath, packageJson, finalNamingMap)
+		await handleTailwind(targetPath, packageJson)
 	}
 
 	if (!answers.usePwa) {
@@ -230,6 +257,8 @@ async function postProcessProject(targetPath, answers, targetDirName) {
 
 	if (answers.usePrettier) {
 		await handlePrettier(targetPath, packageJson, answers)
+	} else {
+		await fs.remove(path.join(targetPath, '.prettierrc'))
 	}
 
 	await handleScriptsAndDocs(targetPath, packageJson, answers, finalNamingMap)
@@ -255,7 +284,7 @@ async function handleFsdNaming(targetPath, fsdNaming) {
 
 	const projectFiles = await getAllFiles(targetPath)
 	for (const file of projectFiles) {
-		if (/\.(js|cjs|mjs|css|html|md)$/.test(file)) {
+		if (/\.(js|cjs|mjs|ts|jsx|tsx|css|html|md)$/.test(file)) {
 			let content = await fs.readFile(file, 'utf8')
 			for (const [oldName, newName] of Object.entries(
 				classicToAlphabeticalMap
@@ -276,7 +305,9 @@ async function handleTailwind(targetPath, packageJson) {
 	packageJson.devDependencies['postcss'] = '^8.4.35'
 	packageJson.devDependencies['autoprefixer'] = '^10.4.18'
 
-	await fs.copy(path.join(__dirname, '../templates/_tailwind'), targetPath)
+	await fs.copy(path.join(__dirname, '../templates/_tailwind'), targetPath, {
+		overwrite: true,
+	})
 
 	const cssPath = path.join(targetPath, 'src/app/styles/index.css')
 	let cssContent = await fs.readFile(cssPath, 'utf8')
@@ -288,19 +319,25 @@ async function handleTailwind(targetPath, packageJson) {
 async function handlePwa(targetPath, packageJson, finalNamingMap) {
 	delete packageJson.dependencies['vite-plugin-pwa']
 
-	const viteConfigPath = path.join(targetPath, 'vite.config.js')
-	let viteConfig = await fs.readFile(viteConfigPath, 'utf8')
-	viteConfig = viteConfig
-		.replace(/import { VitePWA } from 'vite-plugin-pwa'/, '')
-		.replace(/,?\s*VitePWA\({[^)]*\)\s*},?/, '')
-	await fs.writeFile(viteConfigPath, viteConfig)
+	const viteConfigPath = await findViteConfigFile(targetPath)
+	if (viteConfigPath) {
+		let viteConfig = await fs.readFile(viteConfigPath, 'utf8')
+		viteConfig = viteConfig
+			.replace(/import { VitePWA } from 'vite-plugin-pwa'/, '')
+			.replace(/,?\s*VitePWA\({[^)]*\)\s*},?/, '')
+		await fs.writeFile(viteConfigPath, viteConfig)
+	}
 
-	const mainJsPath = path.join(targetPath, 'src', finalNamingMap.app, 'main.js')
-	let mainJs = await fs.readFile(mainJsPath, 'utf8')
-	mainJs = mainJs
-		.replace(/import { registerSW } from 'virtual:pwa-register'/, '')
-		.replace(/registerSW\({[^}]*\)\s*}\)/, '')
-	await fs.writeFile(mainJsPath, mainJs)
+	const appLayerPath = path.join(targetPath, 'src', finalNamingMap.app)
+	const mainFilePath = await findMainFile(appLayerPath)
+
+	if (mainFilePath) {
+		let mainJs = await fs.readFile(mainFilePath, 'utf8')
+		mainJs = mainJs
+			.replace(/import { registerSW } from 'virtual:pwa-register'/, '')
+			.replace(/registerSW\({[^}]*\)\s*}\);?/, '') // Добавлен опциональный `;`
+		await fs.writeFile(mainFilePath, mainJs)
+	}
 
 	await fs
 		.remove(path.join(targetPath, 'public/pwa-192x192.png'))
@@ -350,43 +387,52 @@ async function handlePrettier(
 async function handleScriptsAndDocs(
 	targetPath,
 	packageJson,
-	{ includeScripts, includeDocs, packageManager },
+	{ includeScripts, includeDocs, packageManager, template },
 	finalNamingMap
 ) {
 	if (includeScripts) {
 		const componentScriptPath = path.join(targetPath, 'scripts/component.js')
 		const cleanupScriptPath = path.join(targetPath, 'scripts/cleanup.js')
 
-		const layerChoices = [
-			`${finalNamingMap.shared}/ui`,
-			finalNamingMap.entities,
-			finalNamingMap.features,
-			finalNamingMap.widgets,
-			finalNamingMap.pages,
-		]
-		const pathsToRemove = [
-			`src/${finalNamingMap.features}`,
-			`src/${finalNamingMap.widgets}`,
-			`src/${finalNamingMap.pages}/user`,
-		]
+		if (await fs.pathExists(componentScriptPath)) {
+			const layerChoices = [
+				`${finalNamingMap.shared}/ui`,
+				finalNamingMap.entities,
+				finalNamingMap.features,
+				finalNamingMap.widgets,
+				finalNamingMap.pages,
+			]
 
-		let componentScript = await fs.readFile(componentScriptPath, 'utf8')
-		componentScript = componentScript.replace(
-			"'__LAYER_CHOICES__'",
-			JSON.stringify(layerChoices)
-		)
-		await fs.writeFile(componentScriptPath, componentScript)
+			let componentScript = await fs.readFile(componentScriptPath, 'utf8')
 
-		let cleanupScript = await fs.readFile(cleanupScriptPath, 'utf8')
-		cleanupScript = cleanupScript.replace(
-			"'__PATHS_TO_REMOVE__'",
-			JSON.stringify(pathsToRemove)
-		)
-		await fs.writeFile(cleanupScriptPath, cleanupScript)
+			const isTs = template === 'react-ts'
+			const ext = isTs ? 'tsx' : 'jsx'
+
+			componentScript = componentScript
+				.replace(/'__LAYER_CHOICES__'/g, JSON.stringify(layerChoices))
+				.replace(/__EXT__/g, ext)
+
+			await fs.writeFile(componentScriptPath, componentScript)
+		}
+
+		if (await fs.pathExists(cleanupScriptPath)) {
+			const pathsToRemove = [
+				`src/${finalNamingMap.features}`,
+				`src/${finalNamingMap.widgets}`,
+				`src/${finalNamingMap.pages}/user`,
+			]
+			let cleanupScript = await fs.readFile(cleanupScriptPath, 'utf8')
+			cleanupScript = cleanupScript.replace(
+				"'__PATHS_TO_REMOVE__'",
+				JSON.stringify(pathsToRemove)
+			)
+			await fs.writeFile(cleanupScriptPath, cleanupScript)
+		}
 		console.log(chalk.gray('  - Configured helper scripts.'))
 	} else {
 		delete packageJson.scripts['create:component']
 		delete packageJson.scripts.cleanup
+		await fs.remove(path.join(targetPath, 'scripts')).catch(() => {})
 	}
 
 	if (includeDocs) {
@@ -438,7 +484,9 @@ function printNextSteps(projectName, packageManager, isCurrentDir) {
 	}
 
 	const installCommand = `${packageManager} install`
-	const devCommand = `${packageManager} ${packageManager === 'npm' ? 'run ' : ''}dev`
+	const devCommand = `${packageManager} ${
+		packageManager === 'npm' ? 'run ' : ''
+	}dev`
 
 	console.log(chalk.yellow(`  ${installCommand}`))
 	console.log(chalk.yellow(`  ${devCommand}`))
