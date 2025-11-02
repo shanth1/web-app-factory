@@ -317,26 +317,33 @@ async function handlePrettier(
 	packageJson,
 	{ tabWidth, singleQuote, useSemicolons }
 ) {
-	const basePrettierConfig = {
-		printWidth: 80,
-		useTabs: false,
-		trailingComma: 'es5',
-	}
+	const basePrettierConfigPath = path.resolve(
+		__dirname,
+		'../templates/_shared/.prettierrc'
+	)
+	const basePrettierConfig = await fs.readJson(basePrettierConfigPath)
 
-	const prettierConfig = {
-		...basePrettierConfig,
+	const userOverrides = {
 		tabWidth: tabWidth,
 		singleQuote: singleQuote,
 		semi: useSemicolons,
 	}
 
-	await fs.writeJson(path.join(targetPath, '.prettierrc'), prettierConfig, {
-		spaces: 2,
-	})
+	const finalPrettierConfig = {
+		...basePrettierConfig,
+		...userOverrides,
+	}
+
+	await fs.writeJson(
+		path.join(targetPath, '.prettierrc'),
+		finalPrettierConfig,
+		{ spaces: 2 }
+	)
 
 	packageJson.devDependencies['prettier'] = '^3.2.5'
 	packageJson.devDependencies['eslint-config-prettier'] = '^9.1.0'
 	packageJson.scripts['format'] = 'prettier --write .'
+
 	console.log(chalk.gray('  - Added Prettier configuration and format script.'))
 }
 
