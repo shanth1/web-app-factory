@@ -33,8 +33,9 @@ async function run() {
 			message: 'What is the name of your project?',
 			default: 'my-awesome-app',
 			validate: input =>
+				input === '.' ||
 				/^[a-z0-9-_]+$/.test(input) ||
-				'Project name can only contain lowercase letters, numbers, hyphens, and underscores.',
+				'Project name can only contain lowercase letters, numbers, hyphens, underscores, or be "." for current directory.',
 		},
 		{
 			type: 'list',
@@ -57,16 +58,45 @@ async function run() {
 		},
 	])
 
-	const { projectName, template, includeExtras, packageManager } = answers // <--- Добавили packageManager
-	const targetPath = path.join(process.cwd(), projectName)
+	const { projectName, template, includeExtras, packageManager } = answers
 
-	if (await fs.pathExists(targetPath)) {
+	const isCurrentDir = projectName === '.'
+	const targetPath = isCurrentDir
+		? process.cwd()
+		: path.join(process.cwd(), projectName)
+
+	const targetDirName = isCurrentDir ? path.basename(targetPath) : projectName
+
+	if (!isCurrentDir && (await fs.pathExists(targetPath))) {
 		console.error(chalk.red(`❌ Directory "${projectName}" already exists.`))
 		process.exit(1)
 	}
-	await fs.ensureDir(targetPath)
 
-	console.log(chalk.blue(`\nCreating project in ${targetPath}...`))
+	if (isCurrentDir) {
+		const files = await fs.readdir(targetPath)
+		if (files.length > 0) {
+			const { overwrite } = await inquirer.prompt({
+				type: 'confirm',
+				name: 'overwrite',
+				message: 'Current directory is not empty. Proceed anyway?',
+				default: false,
+			})
+			if (!overwrite) {
+				console.log(chalk.yellow('Operation cancelled.'))
+				process.exit(0)
+			}
+		}
+	}
+
+	if (!isCurrentDir) {
+		await fs.ensureDir(targetPath)
+	}
+
+	console.log(
+		chalk.blue(
+			`\nCreating project in ${isCurrentDir ? 'current directory' : chalk.bold(targetDirName)}...`
+		)
+	)
 
 	const templatePath = path.join(templatesDir, template)
 	const sharedPath = path.join(templatesDir, '_shared')
@@ -81,7 +111,7 @@ async function run() {
 	const packageJsonPath = path.join(targetPath, 'package.json')
 	const packageJson = await fs.readJson(packageJsonPath)
 
-	packageJson.name = projectName
+	packageJson.name = targetDirName
 	packageJson.version = '0.1.0'
 
 	if (!includeExtras) {
@@ -91,9 +121,33 @@ async function run() {
 
 	await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 })
 
+	if (includeExtras) {
+		const readmePath = path.join(targetPath, 'docs', 'README.md')
+		try {
+			let readmeContent = await fs.readFile(readmePath, 'utf-8')
+			const installCmd = `${packageManager} install`
+			const runCmd = packageManager === 'npm' ? 'npm run' : packageManager
+
+			readmeContent = readmeContent.replaceAll('npm install', installCmd)
+			readmeContent = readmeContent.replaceAll('npm run', runCmd)
+
+			await fs.writeFile(readmePath, readmeContent, 'utf-8')
+			console.log(
+				chalk.gray(
+					'  - Updated README.md with selected package manager commands.'
+				)
+			)
+		} catch (error) {
+			console.warn(chalk.yellow('Could not update README.md:', error.message))
+		}
+	}
+
 	console.log(chalk.green('\n✅ Project created successfully!'))
 	console.log('\nNext steps:')
-	console.log(chalk.yellow(`  cd ${projectName}`))
+
+	if (!isCurrentDir) {
+		console.log(chalk.yellow(`  cd ${projectName}`))
+	}
 
 	switch (packageManager) {
 		case 'yarn':

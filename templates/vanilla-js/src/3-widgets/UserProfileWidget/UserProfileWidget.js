@@ -7,11 +7,19 @@ import './UserProfileWidget.css'
 export class UserProfileWidget extends ReactiveComponent {
 	constructor() {
 		super()
-		userStore.subscribe(() => this.forceUpdate())
+		this.unsubscribeFromUserStore = userStore.subscribe(() =>
+			this.forceUpdate()
+		)
 	}
 
 	componentDidMount() {
 		new ReloadUserButton().handleReload()
+	}
+
+	componentWillUnmount() {
+		if (this.unsubscribeFromUserStore) {
+			this.unsubscribeFromUserStore()
+		}
 	}
 
 	render() {

@@ -1,13 +1,10 @@
+import { createReactive } from './createReactive'
+
 export function createStore(initialState) {
 	const listeners = new Set()
+	const notify = () => listeners.forEach(listener => listener())
 
-	const state = new Proxy(initialState, {
-		set: (target, property, value) => {
-			target[property] = value
-			listeners.forEach(listener => listener())
-			return true
-		},
-	})
+	const state = createReactive(initialState, notify)
 
 	return {
 		get state() {
@@ -15,7 +12,7 @@ export function createStore(initialState) {
 		},
 		subscribe(listener) {
 			listeners.add(listener)
-			return () => listeners.delete(listener) // Unsubscribe function
+			return () => listeners.delete(listener)
 		},
 	}
 }

@@ -5,7 +5,13 @@ import chalk from 'chalk'
 
 const srcPath = path.join(process.cwd(), 'src')
 
-const layerChoices = ['0-shared/ui', '2-features', '3-widgets', '4-pages']
+const layerChoices = [
+	'0-shared/ui',
+	'1-entities',
+	'2-features',
+	'3-widgets',
+	'4-pages',
+]
 
 const templates = {
 	component:
