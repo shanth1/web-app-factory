@@ -5,21 +5,15 @@ import chalk from 'chalk'
 
 const srcPath = path.join(process.cwd(), 'src')
 
-const layerChoices = [
-	'0-shared/ui',
-	'1-entities',
-	'2-features',
-	'3-widgets',
-	'4-pages',
-]
+const layerChoices = '__LAYER_CHOICES__'
 
 const templates = {
 	component:
-		name => `import { ReactiveComponent, h } from '@/0-shared/lib/ReactiveComponent';
+		name => `import { ReactiveComponent, h } from '@/shared/lib/ReactiveComponent';
 import './${name}.css';
 
 export class ${name} extends ReactiveComponent {
-  _createDomElement() {
+  render() {
     return h('div', { className: '${name.toLowerCase()}' }, '${name}');
   }
 }

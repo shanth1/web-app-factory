@@ -1,4 +1,4 @@
-import { ReactiveComponent, h } from '@/0-shared/lib/ReactiveComponent'
+import { ReactiveComponent, h } from '@/shared/lib/ReactiveComponent'
 import './HeaderWidget.css'
 
 export class HeaderWidget extends ReactiveComponent {

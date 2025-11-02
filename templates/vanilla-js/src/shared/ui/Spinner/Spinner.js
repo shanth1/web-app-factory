@@ -1,4 +1,4 @@
-import { h } from '@/0-shared/lib/ReactiveComponent'
+import { h } from '@/shared/lib/ReactiveComponent'
 import './Spinner.css'
 
 export const Spinner = () => {

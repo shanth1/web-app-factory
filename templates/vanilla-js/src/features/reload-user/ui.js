@@ -1,7 +1,7 @@
-import { ReactiveComponent, h } from '@/0-shared/lib/ReactiveComponent'
-import { Button } from '@/0-shared/ui/Button'
-import { fetchRandomUser } from '@/0-shared/api/userAPI'
-import { userStore } from '@/1-entities/user/model/store'
+import { ReactiveComponent, h } from '@/shared/lib/ReactiveComponent'
+import { Button } from '@/shared/ui/Button'
+import { fetchRandomUser } from '@/shared/api/userAPI'
+import { userStore } from '@/entities/user/model/store'
 
 export class ReloadUserButton extends ReactiveComponent {
 	async handleReload() {

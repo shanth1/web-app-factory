@@ -2,8 +2,8 @@ import './styles/normalize.css'
 import './styles/index.css'
 
 import { router } from './providers/router'
-import { getUserPage } from '@/4-pages/user'
-import { HeaderWidget } from '@/3-widgets/HeaderWidget'
+import { getUserPage } from '@/pages/user'
+import { HeaderWidget } from '@/widgets/HeaderWidget'
 import { registerSW } from 'virtual:pwa-register'
 
 registerSW({ onNeedRefresh() {}, onOfflineReady() {} })

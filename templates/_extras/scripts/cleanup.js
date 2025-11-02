@@ -7,12 +7,7 @@ const projectRoot = process.cwd()
 async function cleanup() {
 	console.log(chalk.yellow('🧹 Starting project cleanup...'))
 
-	const pathsToRemove = [
-		'src/2-features',
-		'src/3-widgets',
-		'src/4-pages/about',
-		'src/4-pages/home',
-	]
+	const pathsToRemove = '__PATHS_TO_REMOVE__'
 
 	for (const p of pathsToRemove) {
 		try {
@@ -23,7 +18,6 @@ async function cleanup() {
 		}
 	}
 
-	// Очистка package.json
 	const packageJsonPath = path.join(projectRoot, 'package.json')
 	try {
 		const packageJson = await fs.readJson(packageJsonPath)
@@ -34,9 +28,10 @@ async function cleanup() {
 		console.error(chalk.red('Error updating package.json:', err))
 	}
 
-	// Удаляем сам скрипт
 	await fs.remove(path.join(projectRoot, 'scripts'))
 	console.log(chalk.gray('  - Removed: scripts/ folder'))
+	await fs.remove(path.join(projectRoot, 'docs'))
+	console.log(chalk.gray('  - Removed: docs/ folder'))
 
 	console.log(chalk.green('\n✅ Cleanup complete! Your project is ready.'))
 }

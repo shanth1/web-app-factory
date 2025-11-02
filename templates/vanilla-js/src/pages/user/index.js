@@ -1,5 +1,5 @@
-import { ReactiveComponent, h } from '@/0-shared/lib/ReactiveComponent'
-import { UserProfileWidget } from '@/3-widgets/UserProfileWidget'
+import { ReactiveComponent, h } from '@/shared/lib/ReactiveComponent'
+import { UserProfileWidget } from '@/widgets/UserProfileWidget'
 
 class UserPage extends ReactiveComponent {
 	constructor() {

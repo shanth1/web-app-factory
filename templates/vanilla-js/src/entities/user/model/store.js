@@ -1,4 +1,4 @@
-import { createStore } from '@/0-shared/lib/createStore'
+import { createStore } from '@/shared/lib/createStore'
 
 export const userStore = createStore({
 	user: null,

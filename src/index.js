@@ -8,12 +8,19 @@ import chalk from 'chalk'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const templatesDir = path.resolve(__dirname, '../templates')
+
+const classicToAlphabeticalMap = {
+	app: 'app',
+	pages: 'pages',
+	widgets: 'modules',
+	features: 'features',
+	entities: 'domain',
+	shared: 'base',
+}
 
 function getPackageManager() {
 	const userAgent = process.env.npm_config_user_agent
 	if (userAgent) {
-		if (userAgent.startsWith('npm')) return 'npm'
 		if (userAgent.startsWith('yarn')) return 'yarn'
 		if (userAgent.startsWith('pnpm')) return 'pnpm'
 	}
@@ -21,10 +28,8 @@ function getPackageManager() {
 }
 
 async function run() {
-	console.log(chalk.cyan('⚛️  Welcome to the Awesome App Generator!'))
-	console.log(chalk.gray("Let's create a new project from a template."))
-
-	const initialPackageManager = getPackageManager()
+	console.log(chalk.cyan('⚛️  Welcome to the Web App Factory!'))
+	console.log(chalk.gray("Let's configure your new project."))
 
 	const answers = await inquirer.prompt([
 		{
@@ -35,7 +40,7 @@ async function run() {
 			validate: input =>
 				input === '.' ||
 				/^[a-z0-9-_]+$/.test(input) ||
-				'Project name can only contain lowercase letters, numbers, hyphens, underscores, or be "." for current directory.',
+				'Project name can only contain lowercase letters, numbers, hyphens, underscores, or be "." for the current directory.',
 		},
 		{
 			type: 'list',
@@ -44,9 +49,43 @@ async function run() {
 			choices: [{ name: 'Vanilla JavaScript', value: 'vanilla-js' }],
 		},
 		{
+			type: 'list',
+			name: 'fsdNaming',
+			message: 'Choose a Feature-Sliced Design naming convention:',
+			choices: [
+				{
+					name: 'Classic (app, pages, widgets, features, entities, shared) - Recommended',
+					value: 'classic',
+				},
+				{
+					name: 'Alphabetical (app, base, domain, features, modules, pages)',
+					value: 'alpha',
+				},
+			],
+			default: 'classic',
+		},
+		{
 			type: 'confirm',
-			name: 'includeExtras',
-			message: 'Include documentation and helper scripts (recommended)?',
+			name: 'useTailwind',
+			message: 'Add Tailwind CSS for styling?',
+			default: false,
+		},
+		{
+			type: 'confirm',
+			name: 'usePwa',
+			message: 'Enable Progressive Web App (PWA) features?',
+			default: true,
+		},
+		{
+			type: 'confirm',
+			name: 'includeDocs',
+			message: 'Include project documentation (FSD guide)?',
+			default: true,
+		},
+		{
+			type: 'confirm',
+			name: 'includeScripts',
+			message: 'Include helper scripts (component generator, cleanup)?',
 			default: true,
 		},
 		{
@@ -54,19 +93,32 @@ async function run() {
 			name: 'packageManager',
 			message: 'Which package manager do you want to use?',
 			choices: ['npm', 'yarn', 'pnpm'],
-			default: initialPackageManager,
+			default: getPackageManager(),
 		},
 	])
 
-	const { projectName, template, includeExtras, packageManager } = answers
-
+	const { projectName } = answers
 	const isCurrentDir = projectName === '.'
 	const targetPath = isCurrentDir
 		? process.cwd()
 		: path.join(process.cwd(), projectName)
-
 	const targetDirName = isCurrentDir ? path.basename(targetPath) : projectName
 
+	await createProjectDirectory(projectName, targetPath, isCurrentDir)
+
+	console.log(
+		chalk.blue(
+			`\nCreating project in ${isCurrentDir ? 'current directory' : chalk.bold(targetDirName)}...`
+		)
+	)
+
+	await copyTemplateFiles(targetPath, answers)
+	await postProcessProject(targetPath, answers, targetDirName)
+
+	printNextSteps(projectName, answers.packageManager, isCurrentDir)
+}
+
+async function createProjectDirectory(projectName, targetPath, isCurrentDir) {
 	if (!isCurrentDir && (await fs.pathExists(targetPath))) {
 		console.error(chalk.red(`❌ Directory "${projectName}" already exists.`))
 		process.exit(1)
@@ -86,62 +138,217 @@ async function run() {
 				process.exit(0)
 			}
 		}
-	}
-
-	if (!isCurrentDir) {
+	} else {
 		await fs.ensureDir(targetPath)
 	}
+}
 
-	console.log(
-		chalk.blue(
-			`\nCreating project in ${isCurrentDir ? 'current directory' : chalk.bold(targetDirName)}...`
+async function copyTemplateFiles(
+	targetPath,
+	{ template, includeDocs, includeScripts }
+) {
+	const templatesDir = path.resolve(__dirname, '../templates')
+	const copyWithOverwrite = (src, dest) =>
+		fs.copy(src, dest, { overwrite: true })
+
+	await copyWithOverwrite(path.join(templatesDir, template), targetPath)
+	await copyWithOverwrite(path.join(templatesDir, '_shared'), targetPath)
+
+	if (includeDocs) {
+		await copyWithOverwrite(
+			path.join(templatesDir, '_extras', 'docs'),
+			path.join(targetPath, 'docs')
 		)
-	)
+	}
+	if (includeScripts) {
+		await copyWithOverwrite(
+			path.join(templatesDir, '_extras', 'scripts'),
+			path.join(targetPath, 'scripts')
+		)
+	}
+}
 
-	const templatePath = path.join(templatesDir, template)
-	const sharedPath = path.join(templatesDir, '_shared')
-	const extrasPath = path.join(templatesDir, '_extras')
+async function postProcessProject(targetPath, answers, targetDirName) {
+	const {
+		fsdNaming,
+		useTailwind,
+		usePwa,
+		includeDocs,
+		includeScripts,
+		packageManager,
+	} = answers
 
-	await fs.copy(templatePath, targetPath)
-	await fs.copy(sharedPath, targetPath, { overwrite: true })
-	if (includeExtras) {
-		await fs.copy(extrasPath, targetPath, { overwrite: true })
+	let finalNamingMap = {
+		app: 'app',
+		pages: 'pages',
+		widgets: 'widgets',
+		features: 'features',
+		entities: 'entities',
+		shared: 'shared',
 	}
 
-	const packageJsonPath = path.join(targetPath, 'package.json')
-	const packageJson = await fs.readJson(packageJsonPath)
-
-	packageJson.name = targetDirName
-	packageJson.version = '0.1.0'
-
-	if (!includeExtras) {
-		delete packageJson.scripts.cleanup
-		delete packageJson.scripts['create:component']
-	}
-
-	await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 })
-
-	if (includeExtras) {
-		const readmePath = path.join(targetPath, 'docs', 'README.md')
-		try {
-			let readmeContent = await fs.readFile(readmePath, 'utf-8')
-			const installCmd = `${packageManager} install`
-			const runCmd = packageManager === 'npm' ? 'npm run' : packageManager
-
-			readmeContent = readmeContent.replaceAll('npm install', installCmd)
-			readmeContent = readmeContent.replaceAll('npm run', runCmd)
-
-			await fs.writeFile(readmePath, readmeContent, 'utf-8')
-			console.log(
-				chalk.gray(
-					'  - Updated README.md with selected package manager commands.'
-				)
-			)
-		} catch (error) {
-			console.warn(chalk.yellow('Could not update README.md:', error.message))
+	if (fsdNaming === 'alpha') {
+		console.log(chalk.gray('  - Configuring alphabetical FSD layer naming...'))
+		finalNamingMap = classicToAlphabeticalMap
+		const srcPath = path.join(targetPath, 'src')
+		for (const [oldName, newName] of Object.entries(classicToAlphabeticalMap)) {
+			if (oldName !== newName) {
+				const oldPath = path.join(srcPath, oldName)
+				const newPath = path.join(srcPath, newName)
+				if (await fs.pathExists(oldPath)) {
+					await fs.move(oldPath, newPath, { overwrite: true })
+				}
+			}
+		}
+		const projectFiles = await getAllFiles(targetPath)
+		for (const file of projectFiles) {
+			if (/\.(js|cjs|mjs|css|html|md)$/.test(file)) {
+				let content = await fs.readFile(file, 'utf8')
+				let changed = false
+				for (const [oldName, newName] of Object.entries(
+					classicToAlphabeticalMap
+				)) {
+					if (oldName !== newName) {
+						const regex = new RegExp(`([@/])(${oldName})([/'"])`, 'g')
+						if (regex.test(content)) {
+							content = content.replace(regex, `$1${newName}$3`)
+							changed = true
+						}
+					}
+				}
+				if (changed) {
+					await fs.writeFile(file, content, 'utf8')
+				}
+			}
 		}
 	}
 
+	const packageJsonPath = path.join(targetPath, 'package.json')
+	let packageJson = await fs.readJson(packageJsonPath)
+	packageJson.name = targetDirName
+	packageJson.version = '0.1.0'
+
+	if (useTailwind) {
+		packageJson.devDependencies = {
+			...packageJson.devDependencies,
+			tailwindcss: '^3.4.1',
+			postcss: '^8.4.35',
+			autoprefixer: '^10.4.18',
+		}
+
+		const tailwindTemplatesPath = path.join(__dirname, '../templates/_tailwind')
+		await fs.copy(tailwindTemplatesPath, targetPath)
+
+		const appLayerName = finalNamingMap.app
+		const cssPath = path.join(
+			targetPath,
+			'src',
+			appLayerName,
+			'styles/index.css'
+		)
+		let cssContent = await fs.readFile(cssPath, 'utf8')
+		cssContent = `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n${cssContent}`
+		await fs.writeFile(cssPath, cssContent)
+		console.log(chalk.gray('  - Added Tailwind CSS configuration.'))
+	}
+
+	if (!usePwa) {
+		delete packageJson.dependencies['vite-plugin-pwa']
+
+		const viteConfigPath = path.join(targetPath, 'vite.config.js')
+		let viteConfig = await fs.readFile(viteConfigPath, 'utf8')
+		viteConfig = viteConfig
+			.replace(/import { VitePWA } from 'vite-plugin-pwa'/, '')
+			.replace(/,?\s*VitePWA\({[^)]*\)\s*},?/, '')
+		await fs.writeFile(viteConfigPath, viteConfig)
+
+		const appLayerName = finalNamingMap.app
+		const mainJsPath = path.join(targetPath, 'src', appLayerName, 'main.js')
+		let mainJs = await fs.readFile(mainJsPath, 'utf8')
+		mainJs = mainJs
+			.replace(/import { registerSW } from 'virtual:pwa-register'/, '')
+			.replace(/registerSW\({[^}]*\)\s*}\)/, '')
+		await fs.writeFile(mainJsPath, mainJs)
+
+		await fs
+			.remove(path.join(targetPath, 'public', 'pwa-192x192.png'))
+			.catch(() => {})
+		await fs
+			.remove(path.join(targetPath, 'public', 'pwa-512x512.png'))
+			.catch(() => {})
+
+		console.log(chalk.gray('  - Disabled PWA features.'))
+	} else {
+		console.log(chalk.gray('  - Enabled PWA features.'))
+	}
+
+	if (includeScripts) {
+		const componentScriptPath = path.join(targetPath, 'scripts/component.js')
+		const cleanupScriptPath = path.join(targetPath, 'scripts/cleanup.js')
+
+		const layerChoices = [
+			`${finalNamingMap.shared}/ui`,
+			finalNamingMap.entities,
+			finalNamingMap.features,
+			finalNamingMap.widgets,
+			finalNamingMap.pages,
+		]
+
+		const pathsToRemove = [
+			`src/${finalNamingMap.features}`,
+			`src/${finalNamingMap.widgets}`,
+			`src/${finalNamingMap.pages}/user`,
+		]
+
+		let componentScript = await fs.readFile(componentScriptPath, 'utf8')
+		componentScript = componentScript.replace(
+			"'__LAYER_CHOICES__'",
+			JSON.stringify(layerChoices)
+		)
+		await fs.writeFile(componentScriptPath, componentScript)
+
+		let cleanupScript = await fs.readFile(cleanupScriptPath, 'utf8')
+		cleanupScript = cleanupScript.replace(
+			"'__PATHS_TO_REMOVE__'",
+			JSON.stringify(pathsToRemove)
+		)
+		await fs.writeFile(cleanupScriptPath, cleanupScript)
+		console.log(chalk.gray('  - Configured helper scripts.'))
+	} else {
+		delete packageJson.scripts['create:component']
+		delete packageJson.scripts.cleanup
+	}
+
+	if (includeDocs) {
+		const readmePath = path.join(targetPath, 'docs/README.md')
+		let readmeContent = await fs.readFile(readmePath, 'utf-8')
+
+		const installCmd = `${packageManager} install`
+		const runCmd = packageManager === 'npm' ? 'npm run' : packageManager
+		readmeContent = readmeContent
+			.replaceAll('npm install', installCmd)
+			.replaceAll('npm run', runCmd)
+
+		const fsdStructure = Object.values(finalNamingMap)
+			.sort()
+			.map(layer => `- **\`src/${layer}\`**`)
+			.join('\n')
+		const fsdDescription = `The project follows the principles of FSD. Layer structure:\n\n${fsdStructure}`
+		readmeContent = readmeContent.replace(
+			'<!-- FSD_STRUCTURE -->',
+			fsdDescription
+		)
+
+		await fs.writeFile(readmePath, readmeContent, 'utf-8')
+		console.log(chalk.gray('  - Updated documentation.'))
+	} else {
+		await fs.remove(path.join(targetPath, 'docs')).catch(() => {})
+	}
+
+	await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 })
+}
+
+function printNextSteps(projectName, packageManager, isCurrentDir) {
 	console.log(chalk.green('\n✅ Project created successfully!'))
 	console.log('\nNext steps:')
 
@@ -149,20 +356,26 @@ async function run() {
 		console.log(chalk.yellow(`  cd ${projectName}`))
 	}
 
-	switch (packageManager) {
-		case 'yarn':
-			console.log(chalk.yellow('  yarn install'))
-			console.log(chalk.yellow('  yarn dev'))
-			break
-		case 'pnpm':
-			console.log(chalk.yellow('  pnpm install'))
-			console.log(chalk.yellow('  pnpm run dev'))
-			break
-		default: // npm
-			console.log(chalk.yellow('  npm install'))
-			console.log(chalk.yellow('  npm run dev'))
-			break
+	const installCommand = `${packageManager} install`
+	const devCommand = `${packageManager} ${packageManager === 'npm' ? 'run ' : ''}dev`
+
+	console.log(chalk.yellow(`  ${installCommand}`))
+	console.log(chalk.yellow(`  ${devCommand}`))
+}
+
+async function getAllFiles(dirPath, arrayOfFiles = []) {
+	const files = await fs.readdir(dirPath)
+	for (const file of files) {
+		const fullPath = path.join(dirPath, file)
+		if ((await fs.stat(fullPath)).isDirectory()) {
+			if (file !== 'node_modules' && file !== '.git') {
+				await getAllFiles(fullPath, arrayOfFiles)
+			}
+		} else {
+			arrayOfFiles.push(fullPath)
+		}
 	}
+	return arrayOfFiles
 }
 
 run().catch(error => {
